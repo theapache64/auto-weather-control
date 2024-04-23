@@ -97,10 +97,6 @@ void setup() {
     // buzzer
     pinMode(BUZZER_PIN, OUTPUT);
 
-    // servo
-    powerButtonServo.attach(SERVO_PIN);
-    powerButtonServo.write(180); // hands up
-
     // wifi
     wifi.connectToWifi();
     
@@ -112,6 +108,13 @@ void setup() {
 
     // time
     timeClient.begin();
+
+    // servo
+    powerButtonServo.attach(SERVO_PIN);
+    delay(1000);
+    powerButtonServo.write(90);
+    delay(200);
+    powerButtonServo.write(180); // hands up
 
     beepTwice();
 }
@@ -174,6 +177,7 @@ void loop() {
             Serial.println("Humidity: " + String(humidity) + "%");
             Serial.println("Score: " + String(currentScore));
 
+            // TODO: add AC turn on/off message as well
             uploadDhtData(temperature, humidity, currentScore);
 
             // check if its day or night
