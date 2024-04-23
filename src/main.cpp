@@ -125,6 +125,10 @@ AcState acState = OFF;
 int alreadyWarningCount = 0;
 int maxAlreadyWarningCount = -1;
 
+unsigned long acTurnOnAt = 0;
+unsigned long acTurnOffAt = 0;
+
+
 void loop() {    
     String telegramLog = "";
     if ((WiFi.status() == WL_CONNECTED)) {
@@ -218,16 +222,26 @@ void loop() {
                     alreadyWarningCount = 0;
 
                     telegramLog += "\n\n 🟢 AC turned on!";
+                    
+                    acTurnOnAt = timeClient.getEpochTime();
+
+                    // calculate how much time AC was off
+                    if(acTurnOffAt > 0){
+                        unsigned long acOffTime = acTurnOnAt - acTurnOffAt;
+                        int acOffTimeInMinutes = acOffTime / 60;
+                        telegramLog += "\n\n AC was off for " + String(acOffTimeInMinutes) + " minutes!";
+                    }
                 }else{
                     Serial.println("AC is already on...");
                     telegramLog += "\n\n 🟢 AC is already on!";
                     alreadyWarningCount++;
 
                     if(alreadyWarningCount >= maxAlreadyWarningCount) {
-                        telegramLog += "\n\n🔴 AC is already on for " + String(maxAlreadyWarningCount) + " times!";
+                        telegramLog += "\n\n🟠 AC is on, but its still hot! Turning ON AC again 🤔";
                         alreadyWarningCount = 0;
                         pressPowerButton(); // turn on one more time
                         acState = ON;
+                        acTurnOnAt = timeClient.getEpochTime();
                     }
                 }
 
@@ -244,6 +258,15 @@ void loop() {
                     beepTwice();
                     telegramLog += "\n\n 🔴 AC turned OFF!";
                     alreadyWarningCount = 0;
+
+                    acTurnOffAt = timeClient.getEpochTime();
+
+                    // calculate how much time AC was on
+                    if(acTurnOnAt > 0){
+                        unsigned long acOnTime = acTurnOffAt - acTurnOnAt;
+                        int acOnTimeInMinutes = acOnTime / 60;
+                        telegramLog += "\n\n AC was on for " + String(acOnTimeInMinutes) + " minutes!";
+                    }
                     
                 }else{
                     Serial.println("AC is already off...");
@@ -251,10 +274,11 @@ void loop() {
                     alreadyWarningCount++;
 
                     if(alreadyWarningCount >= maxAlreadyWarningCount) {
-                        telegramLog += "\n\n🔴 AC is already off for " + String(maxAlreadyWarningCount) + " times!";
+                        telegramLog += "\n\n🟠 AC is already off, but its still cold! Turning OFF AC again 🤔";
                         alreadyWarningCount = 0;
                         pressPowerButton(); // turn off one more time
                         acState = OFF;
+                        acTurnOffAt = timeClient.getEpochTime();
                     }
                 }
                 telegramLog += "\n Points to turn on " + String(acOnScore - currentScore) + " more!";
