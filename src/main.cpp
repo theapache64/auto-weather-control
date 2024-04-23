@@ -17,8 +17,7 @@
 
 #define DHTTYPE DHT22  // Sensor type
 DHT dht(DHTPIN, DHTTYPE);
-float humidity, temperature;
-float prevHumidity, prevTemperature;
+
 
 Servo powerButtonServo;
 
@@ -156,6 +155,8 @@ void loop() {
             maxAlreadyWarningCount = config["max_already_warning_count"].toInt();
 
             boolean isForceModeEnabled = config["force_mode"] == "TRUE";
+            float temperature;
+            float humidity;
             if(isForceModeEnabled){
                 temperature = dht.readTemperature(false, true);
                 humidity = dht.readHumidity(true);
