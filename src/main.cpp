@@ -164,8 +164,12 @@ void loop() {
                 temperature = dht.readTemperature(false, true);
                 humidity = dht.readHumidity(true);
             }else{
-                temperature = dht.readTemperature();
-                humidity = dht.readHumidity();
+                // run 2 times to fix stale data issue
+                for (int i = 0; i < 2; i++) {
+                    temperature = dht.readTemperature();
+                    humidity = dht.readHumidity();
+                    delay(1000);
+                }
             }
 
             float currentScore = calculateScore(temperature, humidity);
