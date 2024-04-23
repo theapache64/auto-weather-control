@@ -5,9 +5,11 @@
 > Control your air conditioner using an ESP8266, DHT22, and a Servo ;) 
 
 ## Disclaimer
-Please do not treat this as a serious project, but feel free to proceed if you want to bring it to production 😉. This is just me trying to learn IoT things.
+Please do not treat this as a serious project, but feel free to proceed if you want to bring it to production 😉. This is just me trying to learn new things.
 
 ## 😛 Demo 
+
+https://github.com/theapache64/auto-weather-control/assets/9678279/f51eaa5f-3f6f-400e-ae06-2793ad8e74a1
 
 - Source : https://twitter.com/theapache64/status/1776351284066754667
 
@@ -25,7 +27,7 @@ Please do not treat this as a serious project, but feel free to proceed if you w
 - Using these values, the program calculates a score.
 - When the score exceeds a threshold, the servo will move from `0` to `180`, pressing the power button on the remote.
 - The thresholds are coming from a [Google sheet](https://docs.google.com/spreadsheets/d/1nO-hcNX2naH7hCS0WbRd7r907SvisjhD96I8R1Wx1Fs/edit?usp=sharing), so it's easy to calibrate.
-- All this data is synced to the same [Google sheet](https://docs.google.com/spreadsheets/d/1nO-hcNX2naH7hCS0WbRd7r907SvisjhD96I8R1Wx1Fs/edit?usp=sharing).
+- All this data is synced to the same [Google sheet](https://docs.google.com/spreadsheets/d/1nO-hcNX2naH7hCS0WbRd7r907SvisjhD96I8R1Wx1Fs/edit?usp=sharing), so you can draw cool charts as well.
 
 ## ✍️ Author
 
