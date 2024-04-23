@@ -29,7 +29,7 @@ NetworkClient client;
 std::map<String, String> config;
 
 
-void uploadDhtData(float temperature, float humidity, float score);
+void uploadDhtData(float temperature, float humidity, float score, String note);
 void pressPowerButton();
 void logTelegram(String msg);
 float calculateScore(float temperature, float humidity);
@@ -149,7 +149,7 @@ void loop() {
         Serial.println("Work hour end: " + String(workHourEnd));
         Serial.println("Is outside work hours: " + String(isOutsideWorkHours));
         
-        
+        String note = "";
         
         if(shouldSkip){
             Serial.println("Skipping the process...");
@@ -185,8 +185,6 @@ void loop() {
             Serial.println("Humidity: " + String(humidity) + "%");
             Serial.println("Score: " + String(currentScore));
 
-            // TODO: add AC turn on/off message as well
-            uploadDhtData(temperature, humidity, currentScore);
 
             // check if its day or night
 
@@ -230,6 +228,9 @@ void loop() {
                         unsigned long acOffTime = acTurnOnAt - acTurnOffAt;
                         int acOffTimeInMinutes = acOffTime / 60;
                         telegramLog += "\n\n AC was off for " + String(acOffTimeInMinutes) + " minutes!";
+                        note = "🟢 Turning AC ON. Off duration: " + String(acOffTimeInMinutes) + " minutes!";
+                    }else {
+                        note = "🟢 Turning AC ON.";
                     }
                 }else{
                     Serial.println("AC is already on...");
@@ -242,6 +243,7 @@ void loop() {
                         pressPowerButton(); // turn on one more time
                         acState = ON;
                         acTurnOnAt = timeClient.getEpochTime();
+                        note = "🟢🟢 Forcefully turning ON AC";
                     }
                 }
 
@@ -266,6 +268,9 @@ void loop() {
                         unsigned long acOnTime = acTurnOffAt - acTurnOnAt;
                         int acOnTimeInMinutes = acOnTime / 60;
                         telegramLog += "\n\n AC was on for " + String(acOnTimeInMinutes) + " minutes!";
+                        note = "🔴 Turning AC OFF. On duration: " + String(acOnTimeInMinutes) + " minutes!";
+                    }else{
+                        note = "🔴 Turning AC OFF.";
                     }
                     
                 }else{
@@ -279,6 +284,7 @@ void loop() {
                         pressPowerButton(); // turn off one more time
                         acState = OFF;
                         acTurnOffAt = timeClient.getEpochTime();
+                        note = "🔴🔴 Forcefully turning OFF AC";
                     }
                 }
                 telegramLog += "\n Points to turn on " + String(acOnScore - currentScore) + " more!";
@@ -288,6 +294,8 @@ void loop() {
                 telegramLog += "\n Points to turn off " + String(acOffScore - currentScore) + " more!";
                 telegramLog += "\n Points to turn on " + String(acOnScore - currentScore) + " more!";
             }
+
+            uploadDhtData(temperature, humidity, currentScore, note );
         }
     }
 
@@ -344,7 +352,7 @@ void pressPowerButton() {
     powerButtonServo.write(180);
 }
 
-void uploadDhtData(float temperature, float humidity, float score) {
+void uploadDhtData(float temperature, float humidity, float score, String note) {
     //Initializing an HTTPS communication using the secure client
     Serial.println("Connecting to Google Forms...");
     HTTPClient formRequest;
@@ -358,6 +366,7 @@ void uploadDhtData(float temperature, float humidity, float score) {
       String httpRequestData = 
       "entry.243518312=" + String(temperature) 
       + "&entry.1071209622=" + String(score)
+      + "&entry.1423375811=" + String(note)
       + "&entry.962580231=" + String(humidity);
       int httpCode = formRequest.POST(httpRequestData);
       // httpCode will be negative on error
