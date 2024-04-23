@@ -2,28 +2,30 @@
 
 # auto-weather-control
 
-![buildStatus](https://img.shields.io/github/workflow/status/theapache64/auto-weather-control/Java%20CI%20with%20Gradle?style=plastic)
-![latestVersion](https://img.shields.io/github/v/release/theapache64/auto-weather-control)
-<a href="https://twitter.com/theapache64" target="_blank">
-<img alt="Twitter: theapache64" src="https://img.shields.io/twitter/follow/theapache64.svg?style=social" />
-</a>
+> Control your air conditioner using an ESP8266, DHT22, and a Servo ;) 
 
-> Control your air conditioner using ESP8266, DHT22, and a Servo ;)
+## Disclaimer
+Please do not treat this as a serious project, but feel free to proceed if you want to bring it to production 😉. This is just me trying to learn IoT things.
 
-### ✨ Demo
+## 😛 Demo 
 
-![](demo.gif)
+- Source : https://twitter.com/theapache64/status/1776351284066754667
+
 
 ## 🦿 Prerequisites
 
-- Java 8 or above
+- ESP8266
+- DHT22
+- Servo
+- and obviously, your AC remote 😛 (you could also use an IR emitter I guess, but I'm super lazy, so am gonna use my AC remote)
 
-## ⌨️ Usage
+## 🧠 How it works?
 
-1. Step 1
-1. Step 2
-1. Step 3
-
+- The DHT sensor provides room temperature and humidity values.
+- Using these values, the program calculates a score.
+- When the score exceeds a threshold, the servo will move from `0` to `180`, pressing the power button on the remote.
+- The thresholds are coming from a [Google sheet](https://docs.google.com/spreadsheets/d/1nO-hcNX2naH7hCS0WbRd7r907SvisjhD96I8R1Wx1Fs/edit?usp=sharing), so it's easy to calibrate.
+- All this data is synced to the same [Google sheet](https://docs.google.com/spreadsheets/d/1nO-hcNX2naH7hCS0WbRd7r907SvisjhD96I8R1Wx1Fs/edit?usp=sharing).
 
 ## ✍️ Author
 
@@ -52,21 +54,10 @@ Please make sure to update tests as appropriate.
 
 Give a ⭐️ if this project helped you!
 
-<a href="https://www.patreon.com/theapache64">
-  <img alt="Patron Link" src="https://c5.patreon.com/external/logo/become_a_patron_button@2x.png" width="160"/>
-</a>
-
 <a href="https://www.buymeacoffee.com/theapache64" target="_blank">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="160">
 </a>
 
-<a href="https://www.paypal.me/theapache64" target="_blank">
-    <img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="Donation" width="160">
-</a>
-
-## ☑️ TODO
-
-- [ ] Task 1
 
 ## 📝 License
 
