@@ -307,16 +307,17 @@ void loop() {
     delay(sleepTimeInMilliseconds);
 }
 
-// Define comfort levels and weights
-const float comfortTemperature = 23.0;  // Comfortable temperature in Celsius
-const float comfortHumidity = 50.0;     // Comfortable humidity in percentage
-const float tempWeight = 1.5;           // Weight for temperature's contribution
-const float humidityWeight = 1.0;       // Weight for humidity's contribution
-const float tempThreshold = 30.0;       // Threshold for temperature
-const float humidityThreshold = 70.0;   // Threshold for humidity
 
 float calculateScore(float temperature, float humidity) {
     float score = 0.0;  // Initialize score as a float for more nuanced calculations
+
+    // Define comfort levels and weights
+    float comfortTemperature = config["comfort_temperature"].toFloat(); // Comfortable temperature in Celsius
+    float comfortHumidity = config["comfort_humidity"].toFloat(); // Comfortable humidity in percentage
+    float tempWeight = config["temperature_weight"].toFloat(); // Weight for temperature's contribution
+    float humidityWeight = config["humidity_weight"].toFloat();// Weight for humidity's contribution
+    float tempThreshold = config["temperature_threshold"].toFloat(); // Threshold for temperature
+    float humidityThreshold = config["humidity_threshold"].toFloat(); // Threshold for humidity
 
     // Calculate temperature contribution to the score
     if (temperature > comfortTemperature) {
