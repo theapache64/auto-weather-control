@@ -114,7 +114,7 @@ void setup() {
     delay(1000);
     powerButtonServo.write(90);
     delay(200);
-    powerButtonServo.write(180);  // hands up
+    powerButtonServo.write(120);  // hands up
 
     beepTwice();
 }
@@ -395,9 +395,9 @@ float calculateScore(float temperature, float humidity) {
 void pressPowerButton() {
     // Press the power button
     Serial.println("Pressing the power button...");
-    powerButtonServo.write(0);
+    powerButtonServo.write(10); // hit bottom
     delay(200);
-    powerButtonServo.write(180);
+    powerButtonServo.write(120); // hands up
 }
 
 void uploadDhtData(float temperature, float humidity, float score,
