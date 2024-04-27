@@ -142,6 +142,8 @@ void loop() {
             bool isWorkHoursEnabled = config["is_work_hours_enabled"] == "TRUE";
             int workHourStart = config["work_hour_start"].toInt();
             int workHourEnd = config["work_hour_end"].toInt();
+            String mode = config["mode"];
+            bool isOnOff = mode == "ON_OFF";
             int isOutsideWorkHours = isWorkHoursEnabled &&
                                      currentHour <= workHourStart &&
                                      currentHour >= workHourEnd;
@@ -228,51 +230,58 @@ void loop() {
                                ",\n📴 AC OFF @: " + String(acOffScore);
 
                 if (currentScore > acOnScore) {
-                    if (acState != ON) {
-                        Serial.println("AC should be turned on!");
-                        acState = ON;
-
-                        Serial.println("Turning AC on...");
-                        // Turn AC on
-                        pressPowerButton();
-                        beep();
-                        alreadyWarningCount = 0;
-
-                        telegramLog += "\n\n 🟢 AC turned on!";
-
-                        acTurnOnAt = timeClient.getEpochTime();
-
-                        // calculate how much time AC was off
-                        if (acTurnOffAt > 0) {
-                            unsigned long acOffTime = acTurnOnAt - acTurnOffAt;
-                            int acOffTimeInMinutes = acOffTime / 60;
-                            telegramLog += "\n\n AC was off for " +
-                                           String(acOffTimeInMinutes) +
-                                           " minutes!";
-                            note = "🟢 Turning AC ON. Off duration: " +
-                                   String(acOffTimeInMinutes) + " minutes!";
-                        } else {
-                            note = "🟢 Turning AC ON.";
-                        }
-                    } else {
-                        Serial.println("AC is already on...");
-                        telegramLog += "\n\n 🟢 AC is already on!";
-                        alreadyWarningCount++;
-
-                        if (alreadyWarningCount >= maxAlreadyWarningCount) {
-                            telegramLog +=
-                                "\n\n🟠 AC is on, but its still hot! Turning "
-                                "ON AC again 🤔";
-                            alreadyWarningCount = 0;
-                            pressPowerButton();  // turn on one more time
+                    if (isOnOff) {
+                        if (acState != ON) {
+                            Serial.println("AC should be turned on!");
                             acState = ON;
-                            acTurnOnAt = timeClient.getEpochTime();
-                            note = "🟢🟢 Forcefully turning ON AC";
-                        }
-                    }
 
-                    telegramLog += "\n Points to turn off " +
-                                   String(acOffScore - currentScore) + " more!";
+                            Serial.println("Turning AC on...");
+                            // Turn AC on
+                            pressPowerButton();
+                            beep();
+                            alreadyWarningCount = 0;
+
+                            telegramLog += "\n\n 🟢 AC turned on!";
+
+                            acTurnOnAt = timeClient.getEpochTime();
+
+                            // calculate how much time AC was off
+                            if (acTurnOffAt > 0) {
+                                unsigned long acOffTime =
+                                    acTurnOnAt - acTurnOffAt;
+                                int acOffTimeInMinutes = acOffTime / 60;
+                                telegramLog += "\n\n AC was off for " +
+                                               String(acOffTimeInMinutes) +
+                                               " minutes!";
+                                note = "🟢 Turning AC ON. Off duration: " +
+                                       String(acOffTimeInMinutes) + " minutes!";
+                            } else {
+                                note = "🟢 Turning AC ON.";
+                            }
+                        } else {
+                            Serial.println("AC is already on...");
+                            telegramLog += "\n\n 🟢 AC is already on!";
+                            alreadyWarningCount++;
+
+                            if (alreadyWarningCount >= maxAlreadyWarningCount) {
+                                telegramLog +=
+                                    "\n\n🟠 AC is on, but its still hot! "
+                                    "Turning "
+                                    "ON AC again 🤔";
+                                alreadyWarningCount = 0;
+                                pressPowerButton();  // turn on one more time
+                                acState = ON;
+                                acTurnOnAt = timeClient.getEpochTime();
+                                note = "🟢🟢 Forcefully turning ON AC";
+                            }
+                        }
+
+                        telegramLog += "\n Points to turn off " +
+                                       String(acOffScore - currentScore) +
+                                       " more!";
+                    }else{
+                        telegramLog += "\n 🥵 Temperature is high, but auto turn on is disabled!";
+                    }
                 } else if (currentScore < acOffScore) {
                     if (acState != OFF) {
                         Serial.println("AC should be turned off!");
@@ -395,9 +404,9 @@ float calculateScore(float temperature, float humidity) {
 void pressPowerButton() {
     // Press the power button
     Serial.println("Pressing the power button...");
-    powerButtonServo.write(10); // hit bottom
+    powerButtonServo.write(10);  // hit bottom
     delay(200);
-    powerButtonServo.write(120); // hands up
+    powerButtonServo.write(120);  // hands up
 }
 
 void uploadDhtData(float temperature, float humidity, float score,
