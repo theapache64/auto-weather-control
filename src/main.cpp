@@ -187,7 +187,7 @@ void loop() {
                     }
                 }
 
-                if (temperature == NAN || humidity == NAN) {
+                if (isnan(temperature) || isnan(humidity)) {
                     Serial.println( "Temperature or humidity is NAN. Skipping...");
                     telegramLog += "\n\n🟠 Temperature or humidity is NAN. Temperature:" +  String(temperature) + ", Humidity:" + String(humidity);
                 } else {
