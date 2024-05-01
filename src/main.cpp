@@ -94,6 +94,13 @@ void beepTwice() {
 void setup() {
     Serial.begin(115200);
 
+    // servo
+    powerButtonServo.attach(SERVO_PIN);
+    delay(1000);
+    powerButtonServo.write(90);
+    delay(200);
+    powerButtonServo.write(180);  // hands up
+
     // buzzer
     pinMode(BUZZER_PIN, OUTPUT);
 
@@ -109,8 +116,7 @@ void setup() {
     // time
     timeClient.begin();
 
-    // servo
-    powerButtonServo.attach(SERVO_PIN);
+
 
     beepTwice();
 }
@@ -401,8 +407,26 @@ void pressPowerButton() {
     // Press the power button
     Serial.println("Pressing the power button...");
     int handsDownAngle = config["hands_down_angle"].toInt();
+    if(handsDownAngle == 0){
+        handsDownAngle = 0;
+    }
+
     int handsUpAngle = config["hands_up_angle"].toInt();
+    if(handsUpAngle == 0){
+        handsUpAngle = 180;
+    }
+
     int upDownDelay = config["up_down_delay_in_ms"].toInt();
+    if(upDownDelay == 0){
+        upDownDelay = 200;
+    }
+
+    Serial.println("Hands down angle: " + String(handsDownAngle));
+    Serial.println("Hands up angle: " + String(handsUpAngle));
+    Serial.println("Up down delay: " + String(upDownDelay));
+
+    
+
     powerButtonServo.write(handsDownAngle);  // hit bottom
     delay(upDownDelay);
     powerButtonServo.write(handsUpAngle);  // hands up
