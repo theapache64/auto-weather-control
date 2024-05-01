@@ -33,7 +33,6 @@ void uploadDhtData(float temperature, float humidity, float score, String note);
 void pressPowerButton();
 void logTelegram(String msg);
 float calculateScore(float temperature, float humidity);
-void calibServo();
 
 std::map<String, String> fetchConfig() {
     std::map<String, String> data;
@@ -79,15 +78,6 @@ std::map<String, String> fetchConfig() {
     return data;
 }
 
-void calibServo() {
-    for(int i = 0; i < 4; i++){
-        delay(1000);
-        powerButtonServo.write(90);
-        delay(1000);
-        powerButtonServo.write(150);  // hands up
-    }
-}
-
 void beep() {
     digitalWrite(BUZZER_PIN, HIGH);
     delay(100);
@@ -121,7 +111,6 @@ void setup() {
 
     // servo
     powerButtonServo.attach(SERVO_PIN);
-    calibServo();
 
     beepTwice();
 }
@@ -417,11 +406,6 @@ void pressPowerButton() {
     powerButtonServo.write(handsDownAngle);  // hit bottom
     delay(upDownDelay);
     powerButtonServo.write(handsUpAngle);  // hands up
-
-    bool shouldCalibAfterToggle = config["should_calib_after_toggle"] == "TRUE";
-    if(shouldCalibAfterToggle){
-        calibServo();
-    }
 }
 
 void uploadDhtData(float temperature, float humidity, float score,
