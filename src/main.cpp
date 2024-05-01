@@ -116,8 +116,6 @@ void setup() {
     // time
     timeClient.begin();
 
-
-
     beepTwice();
 }
 
@@ -187,160 +185,182 @@ void loop() {
                     }
                 }
 
-                float currentScore = calculateScore(temperature, humidity);
-
-                int sunriseHour = config["sunrise_hour"].toInt();
-                int sunsetHour = config["sunset_hour"].toInt();
-
-                Serial.println("Temperature: " + String(temperature) + "C");
-                Serial.println("Humidity: " + String(humidity) + "%");
-                Serial.println("Score: " + String(currentScore));
-
-                // check if its day or night
-
-                float acOnScore;
-                float acOffScore;
-                if (currentHour >= sunriseHour && currentHour <= sunsetHour) {
-                    Serial.println("Day time");
-                    telegramLog += "\n🌞 Day time: Hour@" + String(currentHour);
-                    acOnScore =
-                        truncf(config["ac_on_score_day"].toFloat() * 100) / 100;
-                    acOffScore =
-                        truncf(config["ac_off_score_day"].toFloat() * 100) /
-                        100;
+                if (temperature == NAN || humidity == NAN) {
+                    Serial.println( "Temperature or humidity is NAN. Skipping...");
+                    telegramLog += "\n\n🟠 Temperature or humidity is NAN. Temperature:" +  String(temperature) + ", Humidity:" + String(humidity);
                 } else {
-                    Serial.println("Night time");
+                    float currentScore = calculateScore(temperature, humidity);
+
+                    int sunriseHour = config["sunrise_hour"].toInt();
+                    int sunsetHour = config["sunset_hour"].toInt();
+
+                    Serial.println("Temperature: " + String(temperature) + "C");
+                    Serial.println("Humidity: " + String(humidity) + "%");
+                    Serial.println("Score: " + String(currentScore));
+
+                    // check if its day or night
+                    float acOnScore;
+                    float acOffScore;
+                    if (currentHour >= sunriseHour &&
+                        currentHour <= sunsetHour) {
+                        Serial.println("Day time");
+                        telegramLog +=
+                            "\n🌞 Day time: Hour@" + String(currentHour);
+                        acOnScore =
+                            truncf(config["ac_on_score_day"].toFloat() * 100) /
+                            100;
+                        acOffScore =
+                            truncf(config["ac_off_score_day"].toFloat() * 100) /
+                            100;
+                    } else {
+                        Serial.println("Night time");
+                        telegramLog +=
+                            "\n🌚 Night time: Hour@" + String(currentHour);
+                        acOnScore =
+                            truncf(config["ac_on_score_night"].toFloat() *
+                                   100) /
+                            100;
+                        acOffScore =
+                            truncf(config["ac_off_score_night"].toFloat() *
+                                   100) /
+                            100;
+                    }
+
+                    Serial.println("Temp score: " + String(currentScore));
+                    Serial.println("AC on score: " + String(acOnScore) +
+                                   " or above");
+                    Serial.println("AC off score: " + String(acOffScore) +
+                                   " or below");
                     telegramLog +=
-                        "\n🌚 Night time: Hour@" + String(currentHour);
-                    acOnScore =
-                        truncf(config["ac_on_score_night"].toFloat() * 100) /
-                        100;
-                    acOffScore =
-                        truncf(config["ac_off_score_night"].toFloat() * 100) /
-                        100;
-                }
+                        "\n☀️ Temperature: " + String(temperature) +
+                        "C,\n💧 Humidity: " + String(humidity) +
+                        ",\n\n📋 currentScore: " + String(currentScore) +
+                        ",\n\n🔛 AC ON @: " + String(acOnScore) +
+                        ",\n📴 AC OFF @: " + String(acOffScore);
 
-                Serial.println("Temp score: " + String(currentScore));
-                Serial.println("AC on score: " + String(acOnScore) +
-                               " or above");
-                Serial.println("AC off score: " + String(acOffScore) +
-                               " or below");
-                telegramLog += "\n☀️ Temperature: " + String(temperature) +
-                               "C,\n💧 Humidity: " + String(humidity) +
-                               ",\n\n📋 currentScore: " + String(currentScore) +
-                               ",\n\n🔛 AC ON @: " + String(acOnScore) +
-                               ",\n📴 AC OFF @: " + String(acOffScore);
+                    if (currentScore > acOnScore) {
+                        if (isOnOff) {
+                            if (acState != ON) {
+                                Serial.println("AC should be turned on!");
+                                acState = ON;
 
-                if (currentScore > acOnScore) {
-                    if (isOnOff) {
-                        if (acState != ON) {
-                            Serial.println("AC should be turned on!");
-                            acState = ON;
+                                Serial.println("Turning AC on...");
+                                // Turn AC on
+                                pressPowerButton();
+                                beep();
+                                alreadyWarningCount = 0;
 
-                            Serial.println("Turning AC on...");
-                            // Turn AC on
+                                telegramLog += "\n\n 🟢 AC turned on!";
+
+                                acTurnOnAt = timeClient.getEpochTime();
+
+                                // calculate how much time AC was off
+                                if (acTurnOffAt > 0) {
+                                    unsigned long acOffTime =
+                                        acTurnOnAt - acTurnOffAt;
+                                    int acOffTimeInMinutes = acOffTime / 60;
+                                    telegramLog += "\n\n AC was off for " +
+                                                   String(acOffTimeInMinutes) +
+                                                   " minutes!";
+                                    note = "🟢 Turning AC ON. Off duration: " +
+                                           String(acOffTimeInMinutes) +
+                                           " minutes!";
+                                } else {
+                                    note = "🟢 Turning AC ON.";
+                                }
+                            } else {
+                                Serial.println("AC is already on...");
+                                telegramLog += "\n\n 🟢 AC is already on!";
+                                alreadyWarningCount++;
+
+                                if (alreadyWarningCount >=
+                                    maxAlreadyWarningCount) {
+                                    telegramLog +=
+                                        "\n\n🟠 AC is on, but its still hot! "
+                                        "Turning "
+                                        "ON AC again 🤔";
+                                    alreadyWarningCount = 0;
+                                    pressPowerButton();  // turn on one more
+                                                         // time
+                                    acState = ON;
+                                    acTurnOnAt = timeClient.getEpochTime();
+                                    note = "🟢🟢 Forcefully turning ON AC";
+                                }
+                            }
+
+                            telegramLog += "\n Points to turn off " +
+                                           String(acOffScore - currentScore) +
+                                           " more!";
+                        } else {
+                            telegramLog +=
+                                "\n 🥵 Temperature is high, but auto turn on "
+                                "is "
+                                "disabled!";
+                        }
+                    } else if (currentScore < acOffScore) {
+                        if (acState != OFF) {
+                            Serial.println("AC should be turned off!");
+                            acState = OFF;
+
+                            Serial.println("Turning AC off...");
+                            // Turn AC off
                             pressPowerButton();
-                            beep();
+                            beepTwice();
+                            telegramLog += "\n\n 🔴 AC turned OFF!";
                             alreadyWarningCount = 0;
 
-                            telegramLog += "\n\n 🟢 AC turned on!";
+                            acTurnOffAt = timeClient.getEpochTime();
 
-                            acTurnOnAt = timeClient.getEpochTime();
-
-                            // calculate how much time AC was off
-                            if (acTurnOffAt > 0) {
-                                unsigned long acOffTime =
-                                    acTurnOnAt - acTurnOffAt;
-                                int acOffTimeInMinutes = acOffTime / 60;
-                                telegramLog += "\n\n AC was off for " +
-                                               String(acOffTimeInMinutes) +
+                            // calculate how much time AC was on
+                            if (acTurnOnAt > 0) {
+                                unsigned long acOnTime =
+                                    acTurnOffAt - acTurnOnAt;
+                                int acOnTimeInMinutes = acOnTime / 60;
+                                telegramLog += "\n\n AC was on for " +
+                                               String(acOnTimeInMinutes) +
                                                " minutes!";
-                                note = "🟢 Turning AC ON. Off duration: " +
-                                       String(acOffTimeInMinutes) + " minutes!";
+                                note = "🔴 Turning AC OFF. On duration: " +
+                                       String(acOnTimeInMinutes) + " minutes!";
                             } else {
-                                note = "🟢 Turning AC ON.";
+                                note = "🔴 Turning AC OFF.";
                             }
+
                         } else {
-                            Serial.println("AC is already on...");
-                            telegramLog += "\n\n 🟢 AC is already on!";
+                            Serial.println("AC is already off...");
+                            telegramLog += "\n\n🔴 AC is already off!";
                             alreadyWarningCount++;
 
                             if (alreadyWarningCount >= maxAlreadyWarningCount) {
                                 telegramLog +=
-                                    "\n\n🟠 AC is on, but its still hot! "
-                                    "Turning "
-                                    "ON AC again 🤔";
+                                    "\n\n🟠 AC is already off, but its still "
+                                    "cold! "
+                                    "Turning OFF AC again 🤔";
                                 alreadyWarningCount = 0;
-                                pressPowerButton();  // turn on one more time
-                                acState = ON;
-                                acTurnOnAt = timeClient.getEpochTime();
-                                note = "🟢🟢 Forcefully turning ON AC";
+                                pressPowerButton();  // turn off one more time
+                                acState = OFF;
+                                acTurnOffAt = timeClient.getEpochTime();
+                                note = "Forcefully turning OFF AC";
                             }
                         }
-
+                        telegramLog += "\n Points to turn on " +
+                                       String(acOnScore - currentScore) +
+                                       " more!";
+                    } else {
+                        Serial.println(
+                            "Temperature is within the acceptable range...");
+                        telegramLog +=
+                            "\n\n🟡 Temperature is within the acceptable "
+                            "range!";
                         telegramLog += "\n Points to turn off " +
                                        String(acOffScore - currentScore) +
                                        " more!";
-                    }else{
-                        telegramLog += "\n 🥵 Temperature is high, but auto turn on is disabled!";
+                        telegramLog += "\n Points to turn on " +
+                                       String(acOnScore - currentScore) +
+                                       " more!";
                     }
-                } else if (currentScore < acOffScore) {
-                    if (acState != OFF) {
-                        Serial.println("AC should be turned off!");
-                        acState = OFF;
 
-                        Serial.println("Turning AC off...");
-                        // Turn AC off
-                        pressPowerButton();
-                        beepTwice();
-                        telegramLog += "\n\n 🔴 AC turned OFF!";
-                        alreadyWarningCount = 0;
-
-                        acTurnOffAt = timeClient.getEpochTime();
-
-                        // calculate how much time AC was on
-                        if (acTurnOnAt > 0) {
-                            unsigned long acOnTime = acTurnOffAt - acTurnOnAt;
-                            int acOnTimeInMinutes = acOnTime / 60;
-                            telegramLog += "\n\n AC was on for " +
-                                           String(acOnTimeInMinutes) +
-                                           " minutes!";
-                            note = "🔴 Turning AC OFF. On duration: " +
-                                   String(acOnTimeInMinutes) + " minutes!";
-                        } else {
-                            note = "🔴 Turning AC OFF.";
-                        }
-
-                    } else {
-                        Serial.println("AC is already off...");
-                        telegramLog += "\n\n🔴 AC is already off!";
-                        alreadyWarningCount++;
-
-                        if (alreadyWarningCount >= maxAlreadyWarningCount) {
-                            telegramLog +=
-                                "\n\n🟠 AC is already off, but its still cold! "
-                                "Turning OFF AC again 🤔";
-                            alreadyWarningCount = 0;
-                            pressPowerButton();  // turn off one more time
-                            acState = OFF;
-                            acTurnOffAt = timeClient.getEpochTime();
-                            note = "Forcefully turning OFF AC";
-                        }
-                    }
-                    telegramLog += "\n Points to turn on " +
-                                   String(acOnScore - currentScore) + " more!";
-                } else {
-                    Serial.println(
-                        "Temperature is within the acceptable range...");
-                    telegramLog +=
-                        "\n\n🟡 Temperature is within the acceptable range!";
-                    telegramLog += "\n Points to turn off " +
-                                   String(acOffScore - currentScore) + " more!";
-                    telegramLog += "\n Points to turn on " +
-                                   String(acOnScore - currentScore) + " more!";
+                    uploadDhtData(temperature, humidity, currentScore, note);
                 }
-
-                uploadDhtData(temperature, humidity, currentScore, note);
             }
         }
     }
@@ -407,17 +427,17 @@ void pressPowerButton() {
     // Press the power button
     Serial.println("Pressing the power button...");
     int handsDownAngle = config["hands_down_angle"].toInt();
-    if(handsDownAngle == 0){
+    if (handsDownAngle == 0) {
         handsDownAngle = 0;
     }
 
     int handsUpAngle = config["hands_up_angle"].toInt();
-    if(handsUpAngle == 0){
+    if (handsUpAngle == 0) {
         handsUpAngle = 180;
     }
 
     int upDownDelay = config["up_down_delay_in_ms"].toInt();
-    if(upDownDelay == 0){
+    if (upDownDelay == 0) {
         upDownDelay = 200;
     }
 
@@ -425,8 +445,8 @@ void pressPowerButton() {
     Serial.println("Hands up angle: " + String(handsUpAngle));
     Serial.println("Up down delay: " + String(upDownDelay));
 
-    
-
+    powerButtonServo.write(handsUpAngle);  // hands up
+    delay(1000);
     powerButtonServo.write(handsDownAngle);  // hit bottom
     delay(upDownDelay);
     powerButtonServo.write(handsUpAngle);  // hands up
