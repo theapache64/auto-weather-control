@@ -181,6 +181,8 @@ void loop() {
                     for (int i = 0; i < 2; i++) {
                         temperature = dht.readTemperature();
                         humidity = dht.readHumidity();
+                        Serial.println("Temperature: " + String(temperature) + "C");
+                        Serial.println("Humidity: " + String(humidity) + "%");
                         delay(5000);
                     }
                 }
