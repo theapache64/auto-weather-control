@@ -22,6 +22,9 @@ DHT dht(DHTPIN, DHTTYPE);
 
 Servo powerButtonServo;
 
+// Boolean to enable or disable SERVO
+bool servoEnabled = false;
+
 // Global variables
 WiFiConnection wifi;
 WiFiUDP ntpUDP;
@@ -37,7 +40,7 @@ float calculateScore(float temperature, float humidity);
 std::map<String, String> fetchConfig() {
     std::map<String, String> data;
     HTTPClient formRequest;
-    if (formRequest.begin(*client.httpClient, GOOGLE_FORM_URL)) {
+    if (formRequest.begin(*client.httpClient, GOOGLE_SHEET_URL)) {
         int responseCode = formRequest.GET();
         if (responseCode > 0) {
             String payload = formRequest.getString();
@@ -94,12 +97,19 @@ void beepTwice() {
 void setup() {
     Serial.begin(115200);
 
-    // servo
-    powerButtonServo.attach(SERVO_PIN);
-    delay(1000);
-    powerButtonServo.write(90);
-    delay(200);
-    powerButtonServo.write(180);  // hands up
+    if(servoEnabled) {
+        Serial.println("Servo is enabled");
+
+        // servo
+        powerButtonServo.attach(SERVO_PIN);
+        delay(1000);
+        powerButtonServo.write(90);
+        delay(200);
+        powerButtonServo.write(180);  // hands up
+    } else {
+        Serial.println("Servo is disabled");
+    }
+
 
     // buzzer
     pinMode(BUZZER_PIN, OUTPUT);
@@ -447,11 +457,15 @@ void pressPowerButton() {
     Serial.println("Hands up angle: " + String(handsUpAngle));
     Serial.println("Up down delay: " + String(upDownDelay));
 
-    powerButtonServo.write(handsUpAngle);  // hands up
-    delay(1000);
-    powerButtonServo.write(handsDownAngle);  // hit bottom
-    delay(upDownDelay);
-    powerButtonServo.write(handsUpAngle);  // hands up
+    if(servoEnabled) {
+        powerButtonServo.write(handsUpAngle);  // hands up
+        delay(1000);
+        powerButtonServo.write(handsDownAngle);  // hit bottom
+        delay(upDownDelay);
+        powerButtonServo.write(handsUpAngle);  // hands up
+    } else {
+        Serial.println("Servo is disabled, not pressing the button");
+    }
 }
 
 void uploadDhtData(float temperature, float humidity, float score,
@@ -459,7 +473,7 @@ void uploadDhtData(float temperature, float humidity, float score,
     // Initializing an HTTPS communication using the secure client
     Serial.println("Connecting to Google Forms...");
     HTTPClient formRequest;
-    if (formRequest.begin(*client.httpClient, GOOGLE_SHEET_URL)) {  // HTTPS
+    if (formRequest.begin(*client.httpClient, GOOGLE_FORM_URL)) {  // HTTPS
         Serial.print("[HTTPS] POST...\n");
 
         formRequest.addHeader("Content-Type",
