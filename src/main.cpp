@@ -387,53 +387,100 @@ void loop() {
     delay(sleepTimeInMilliseconds);
 }
 
-float calculateScore(float temperature, float humidity) {
-    float score =
-        0.0;  // Initialize score as a float for more nuanced calculations
 
-    // Define comfort levels and weights
-    float comfortTemperature =
-        config["comfort_temperature"]
-            .toFloat();  // Comfortable temperature in Celsius
-    float comfortHumidity =
-        config["comfort_humidity"]
-            .toFloat();  // Comfortable humidity in percentage
-    float tempWeight = config["temperature_weight"]
-                           .toFloat();  // Weight for temperature's contribution
-    float humidityWeight =
-        config["humidity_weight"]
-            .toFloat();  // Weight for humidity's contribution
-    float tempThreshold =
-        config["temperature_threshold"].toFloat();  // Threshold for temperature
-    float humidityThreshold =
-        config["humidity_threshold"].toFloat();  // Threshold for humidity
-
-    // Calculate temperature contribution to the score
-    if (temperature > comfortTemperature) {
-        if (temperature > tempThreshold) {
-            // Apply a non-linear increase past the threshold
-            score += tempWeight * (10 + pow((temperature - tempThreshold), 2));
-        } else {
-            score += tempWeight * (temperature - comfortTemperature);
+// Helper function to calculate Heat Index (simplified version for indoor use)
+float calculateHeatIndex(float tempC, float humidity) {
+    // For temperatures below 26°C, heat index has minimal effect
+    if (tempC < 26.0) {
+        return tempC + (humidity > 70.0 ? (humidity - 70.0) * 0.02 : 0);
+    }
+    
+    // Convert to Fahrenheit for calculation
+    float tempF = (tempC * 9.0 / 5.0) + 32.0;
+    
+    // Simplified heat index formula (Steadman's approximation)
+    float heatIndexF = 0.5 * (tempF + 61.0 + ((tempF - 68.0) * 1.2) + (humidity * 0.094));
+    
+    // For higher temperatures, use more accurate formula
+    if (heatIndexF > 80.0) {
+        float T = tempF;
+        float RH = humidity;
+        
+        heatIndexF = -42.379 + 
+                    2.04901523 * T + 
+                    10.14333127 * RH + 
+                    -0.22475541 * T * RH + 
+                    -0.00683783 * T * T + 
+                    -0.05481717 * RH * RH + 
+                    0.00122874 * T * T * RH + 
+                    0.00085282 * T * RH * RH + 
+                    -0.00000199 * T * T * RH * RH;
+        
+        // Adjustments for specific conditions
+        if (RH < 13.0 && T >= 80.0 && T <= 112.0) {
+            heatIndexF -= ((13.0 - RH) / 4.0) * sqrt((17.0 - abs(T - 95.0)) / 17.0);
+        }
+        if (RH > 85.0 && T >= 80.0 && T <= 87.0) {
+            heatIndexF += ((RH - 85.0) / 10.0) * ((87.0 - T) / 5.0);
         }
     }
+    
+    // Convert back to Celsius
+    return (heatIndexF - 32.0) * 5.0 / 9.0;
+}
 
-    // Calculate humidity contribution to the score
+float calculateScore(float temperature, float humidity) {
+    // Get config values
+    float comfortTemperature = config["comfort_temperature"].toFloat();
+    float comfortHumidity = config["comfort_humidity"].toFloat();
+    float tempWeight = config["temperature_weight"].toFloat();
+    float humidityWeight = config["humidity_weight"].toFloat();
+    float tempThreshold = config["temperature_threshold"].toFloat();
+    float humidityThreshold = config["humidity_threshold"].toFloat();
+    
+    // Calculate Heat Index for more realistic "feels like" temperature
+    float feelsLikeTemp = calculateHeatIndex(temperature, humidity);
+    
+    float score = 0.0;
+    
+    // Temperature contribution using Heat Index (feels like temperature)
+    if (feelsLikeTemp > comfortTemperature) {
+        if (feelsLikeTemp > tempThreshold) {
+            // Non-linear increase past threshold - heat becomes exponentially more uncomfortable
+            score += tempWeight * (10 + pow((feelsLikeTemp - tempThreshold), 2));
+        } else {
+            score += tempWeight * (feelsLikeTemp - comfortTemperature);
+        }
+    }
+    
+    // Humidity contribution - high humidity makes it harder to cool down
     if (humidity > comfortHumidity) {
         if (humidity > humidityThreshold) {
-            // Apply a non-linear increase past the threshold
-            score +=
-                humidityWeight * (5 + pow((humidity - humidityThreshold), 1.5));
+            // Non-linear increase for high humidity - sweating becomes less effective
+            score += humidityWeight * (5 + pow((humidity - humidityThreshold), 1.5));
         } else {
             score += humidityWeight * (humidity - comfortHumidity);
         }
     }
-
+    
+    // Additional realistic factors
+    
+    // Humidity amplification effect - very high humidity makes any heat much worse
+    if (humidity > 75.0 && temperature > comfortTemperature) {
+        float humidityAmplifier = (humidity - 75.0) / 25.0; // 0 to 1 scale
+        score += tempWeight * (temperature - comfortTemperature) * humidityAmplifier;
+    }
+    
+    // Low humidity relief - dry air feels slightly better even when hot
+    if (humidity < 40.0 && temperature > comfortTemperature) {
+        float dryAirRelief = (40.0 - humidity) / 40.0 * 0.3; // Small relief factor
+        score *= (1.0 - dryAirRelief);
+    }
+    
     score = truncf(score * 100) / 100;
-
-    // Return the calculated score
     return score;
 }
+
 
 void pressPowerButton() {
     // Press the power button
