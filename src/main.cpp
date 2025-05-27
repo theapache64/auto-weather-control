@@ -1,43 +1,73 @@
 #include <Arduino.h>
-#include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <Keys.h>
-#include <NTPClient.h>
-#include <Servo.h>
-#include <WiFiClientSecureBearSSL.h>
-#include <WiFiUDP.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#include <ArduinoJson.h>
+#include "secrets.h"
 
-#include <NetworkClient.cpp>
-#include <WiFi.cpp>
-#include <map>
+const String serverNameFirstHit = "http://api.weatherapi.com/v1/current.json?key=" + String(WEATHER_API_KEY) + "&q=" + String(WEATHER_API_LOCATION) + "&aqi=no";
+const String AUTH_TOKEN = String(AUTHORIZATION_TOKEN);
+const int DEVICE_SWITCH_PIN = 0;
+const int WIFI_LED = 2;
+const int MIN_TEMPERATURE = 20;
+const int MAX_TEMPERATURE = 25;
+const bool isWorkHoursEnabled = true;
+const int workHourStart = 6;  // 6 AM
+const int workHourEnd = 18;   // 6 PM
 
-#include "DHT.h"
+// Function declarations
+void setupWiFi();
+void updateServerIP();
+void updateDeviceStatus();
+void printWeatherData(String jsonData);
+String httpGETRequest(const char *serverName);
+bool isWithinWorkHours(int currentHour, int startHour, int endHour);
 
-#define BUZZER_PIN D2
-#define DHTPIN D1
-#define SERVO_PIN D0
+String serverIP;
+void setup()
+{
+  Serial.begin(115200);
+  Serial.println("🌡️ Auto Weather Control - v3.0.0");
 
-#define DHTTYPE DHT22  // Sensor type
-DHT dht(DHTPIN, DHTTYPE);
+  // Initialize device switch pin to HIGH (inverted logic)
+  pinMode(DEVICE_SWITCH_PIN, OUTPUT);
+  digitalWrite(DEVICE_SWITCH_PIN, HIGH);
 
-Servo powerButtonServo;
+  // Initialize WiFi LED
+  pinMode(WIFI_LED, OUTPUT);
+  digitalWrite(WIFI_LED, LOW);
 
-// Boolean to enable or disable SERVO
-bool servoEnabled = false;
+  // Connect to WiFi
+  setupWiFi();
 
-// Global variables
-WiFiConnection wifi;
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "time.google.com", 19800, 3600000);  // 1 hour
-NetworkClient client;
-std::map<String, String> config;
+  // Get server IP
+  updateServerIP();
+}
 
-void uploadDhtData(float temperature, float humidity, float score, String note);
-void pressPowerButton();
-void logTelegram(String msg);
-float calculateScore(float temperature, float humidity);
+void loop()
+{
+  delay(1000); // 1 second delay
 
-// Helper function to check if current hour is within work hours range
+  static unsigned long lastTime = 0;
+  unsigned long timerDelay = 5000; // 5 seconds
+
+  if ((millis() - lastTime) > timerDelay)
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      digitalWrite(WIFI_LED, HIGH);
+      updateDeviceStatus();
+    }
+    else
+    {
+      digitalWrite(WIFI_LED, LOW);
+      Serial.println("WiFi Disconnected");
+    }
+    lastTime = millis();
+  }
+}
+
+// Helper function to determine if current time is within work hours
 bool isWithinWorkHours(int currentHour, int startHour, int endHour) {
     if (startHour <= endHour) {
         // Normal case: e.g., 9 to 17 (9 AM to 5 PM)
@@ -48,132 +78,137 @@ bool isWithinWorkHours(int currentHour, int startHour, int endHour) {
     }
 }
 
-std::map<String, String> fetchConfig() {
-    std::map<String, String> data;
-    HTTPClient formRequest;
-    if (formRequest.begin(*client.httpClient, GOOGLE_SHEET_URL)) {
-        int responseCode = formRequest.GET();
-        if (responseCode > 0) {
-            String payload = formRequest.getString();
-            // Parse the payload and populate the data map
+void setupWiFi()
+{
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.println("🌐 Connecting");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("✅ Connected to WiFi network with IP Address: ");
+  Serial.println(WiFi.localIP());
+}
 
-            int startPos = 0;
-            int endPos = payload.indexOf('\n');
-            bool isLastItem = false;
-            while (endPos != -1) {
-                Serial.println("---------------");
+void updateServerIP()
+{
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    String jsonData = httpGETRequest(serverNameFirstHit.c_str());
+    if (jsonData != "")
+    {
+      StaticJsonDocument<200> doc;
+      DeserializationError error = deserializeJson(doc, jsonData);
 
-                String line = payload.substring(startPos, endPos);
-
-                int commaPos = line.indexOf(',');
-                if (commaPos != -1) {
-                    String key = line.substring(1, commaPos - 1);
-                    key.replace("\"", "");
-                    String value =
-                        line.substring(commaPos + 2, line.length() - 1);
-                    value.replace("\"", "");
-
-                    data[key] = value;
-                }
-                startPos = endPos + 1;
-                endPos = payload.indexOf('\n', startPos);
-                if (isLastItem) {
-                    break;
-                }
-
-                if (endPos == -1) {
-                    endPos = payload.length();
-                    isLastItem = true;
-                }
-            }
-        }
+      if (!error)
+      {
+        float temp = doc["current"]["temp_c"];
+        Serial.println("✅ Weather API working. Current temperature: " + String(temp) + "°C");
+      }
     }
-
-    return data;
+  }
 }
 
-void beep() {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
-    digitalWrite(BUZZER_PIN, LOW);
-    delay(100);
-}
+void updateDeviceStatus()
+{
+  String jsonData = httpGETRequest(serverNameFirstHit.c_str());
+  if (jsonData != "")
+  {
+    printWeatherData(jsonData);
 
-void beepTwice() {
-    beep();
-    delay(200);
-    beep();
-}
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, jsonData);
 
-void setup() {
-    Serial.begin(115200);
+    if (!error)
+    {
+      // Get current temperature
+      float temp = doc["current"]["temp_c"];
+      Serial.println("🌡️ Current temp: " + String(temp) + "°C");
 
-    if(servoEnabled) {
-        Serial.println("🤖 Servo system is ready and enabled");
+      // Get current hour
+      time_t now = time(nullptr);
+      struct tm *timeinfo = localtime(&now);
+      int currentHour = timeinfo->tm_hour;
 
-        // servo
-        powerButtonServo.attach(SERVO_PIN);
-        delay(1000);
-        powerButtonServo.write(90);
-        delay(200);
-        powerButtonServo.write(180);  // hands up
-    } else {
-        Serial.println("ℹ️ Servo system is currently disabled");
+      // Check if current time is outside work hours
+      bool isOutsideWorkHours = isWorkHoursEnabled &&
+                              !isWithinWorkHours(currentHour, workHourStart, workHourEnd);
+
+      if (isWorkHoursEnabled) {
+          Serial.println("📅 Work hours: " + String(workHourStart) + ":00 to " + String(workHourEnd) + ":00");
+          Serial.println(isOutsideWorkHours ? "🌙 Currently outside work hours" : "🌞 Currently within work hours");
+      }
+
+      if (temp < MIN_TEMPERATURE || temp > MAX_TEMPERATURE || isOutsideWorkHours)
+      {
+        // Temperature is out of range or outside work hours, turn off the device
+        digitalWrite(DEVICE_SWITCH_PIN, HIGH);
+        Serial.println("❌ Turned OFF the device");
+      }
+      else
+      {
+        // Temperature is within range and within work hours, turn on the device
+        digitalWrite(DEVICE_SWITCH_PIN, LOW);
+        Serial.println("✅ Turned ON the device");
+      }
     }
-
-
-    // buzzer
-    pinMode(BUZZER_PIN, OUTPUT);
-
-    // wifi
-    wifi.connectToWifi();
-
-    // temperature and humidity sensor
-    dht.begin();
-
-    // config
-    config = fetchConfig();
-
-    // time
-    timeClient.begin();
-
-    beepTwice();
+  }
 }
 
-enum AcState { OFF, ON };
-AcState acState = OFF;
+void printWeatherData(String jsonData)
+{
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, jsonData);
 
-int alreadyWarningCount = 0;
-int maxAlreadyWarningCount = -1;
+  if (!error)
+  {
+    Serial.print("Country: ");
+    Serial.println(doc["location"]["country"].as<String>());
 
-unsigned long acTurnOnAt = 0;
-unsigned long acTurnOffAt = 0;
+    Serial.print("City: ");
+    Serial.println(doc["location"]["name"].as<String>());
 
-void loop() {
-    String telegramLog = "";
-    if ((WiFi.status() == WL_CONNECTED)) {
-        timeClient.update();
-        int currentHour = timeClient.getHours();
+    Serial.print("Temperature: ");
+    Serial.print(doc["current"]["temp_c"].as<float>(), 1);
+    Serial.println("°C");
 
-        config = fetchConfig();
-        if (config.empty()) {
-            telegramLog += "🚨 Unable to load configuration. Please check the connection.";
-        } else {
-            bool shouldSkip = config["should_skip"] == "TRUE";
-            bool isWorkHoursEnabled = config["is_work_hours_enabled"] == "TRUE";
-            int workHourStart = config["work_hour_start"].toInt();
-            int workHourEnd = config["work_hour_end"].toInt();
-            String mode = config["mode"];
-            bool isOnOff = mode == "ON_OFF";
-            bool isOutsideWorkHours = isWorkHoursEnabled &&
-                                    !isWithinWorkHours(currentHour, workHourStart, workHourEnd);
+    Serial.print("Feels like: ");
+    Serial.print(doc["current"]["feelslike_c"].as<float>(), 1);
+    Serial.println("°C");
 
-            Serial.println("🕐 Current time: " + String(currentHour) + ":00");
-            Serial.println(shouldSkip ? "⏭️ System is set to skip" : "✅ System is active");
-            Serial.println(isWorkHoursEnabled ? "⏰ Work hours mode is active" : "🔄 24/7 mode is active");
-            if (isWorkHoursEnabled) {
-                Serial.println("📅 Work hours: " + String(workHourStart) + ":00 to " + String(workHourEnd) + ":00");
-                Serial.println(isOutsideWorkHours ? "🌙 Currently outside work hours" : "🌞 Currently within work hours");
-            }
+    Serial.print("Condition: ");
+    Serial.println(doc["current"]["condition"]["text"].as<String>());
+  }
+}
 
-            // Rest of the file remains the same
+String httpGETRequest(const char *serverName)
+{
+  WiFiClient client;
+  HTTPClient http;
+
+  // Your IP address with path or Domain name with URL path
+  http.begin(client, serverName);
+
+  // Send HTTP POST request
+  int httpResponseCode = http.GET();
+
+  String payload = "";
+
+  if (httpResponseCode > 0)
+  {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else
+  {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+
+  return payload;
+}
